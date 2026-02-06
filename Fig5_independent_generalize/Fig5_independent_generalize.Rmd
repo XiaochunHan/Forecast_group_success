@@ -1,0 +1,50 @@
+---
+title: "Fig5_independent_generalize"
+author: "Xiaochun Han"
+date: "2026-02-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+rm(list = ls())
+source("../functions_library.R")
+load_packages(c("dplyr", "caret", "e1071","ggplot2", "pROC", "reshape2", "rstatix","pROC"))
+```
+
+## Import data
+```{r import dev_data}
+Develop_WNC_BNC_invest = readRDS("data_WNC_BNC_invest.RData")
+General_WNC_BNC_invest = readRDS("General_data_WNC_BNC_invest.RData")
+```
+
+### Accuracy
+```{r svm_acc_both}
+acc_wns_bns = svm_general_accuracy(Develop_WNC_BNC_invest,General_WNC_BNC_invest)
+```
+### AUC
+```{r svm_auc_both}
+auc_wns_bns = svm_general_auc(Develop_WNC_BNC_invest,General_WNC_BNC_invest,cond_col = "#5BB9E8")
+```
+
+### Permutation
+```{r svm_perm,eval=FALSE}
+acc_gen_perm = svm_general_accuracy_perm(Develop_WNC_BNC_invest,General_WNC_BNC_invest,5000)
+saveRDS(acc_gen_perm, 'svm_gen_perm_WNC_BNC_win_5000.RData')
+```
+
+#### figure
+```{r svm_perm_figure}
+acc_gen_perm = readRDS("svm_gen_perm_WNC_BNC_win_5000.RData")
+acc_low_25 = sort(acc_gen_perm$acc_perm)[125]
+acc_top_25 = sort(acc_gen_perm$acc_perm)[4875]
+acc_gen_perm$ci95 = rep(0,5000)
+acc_gen_perm$ci95[(acc_gen_perm$acc_perm<acc_low_25|acc_gen_perm$acc_perm>acc_top_25)] = 1
+
+p <- ggplot(acc_gen_perm, aes(x = acc_perm, fill = as.factor(ci95))) +
+    geom_histogram(colour = "#4C4C4C", bins = 33) + 
+    scale_fill_manual(values = c("white","#5BB9E8"))+
+    geom_vline(aes(xintercept = acc_wns_bns[[1]]), color = "#5BB9E8", linewidth = 3) + theme_classic()+xlim(0,1) + 
+    labs(x = "Win-Lose Prediction Accuracy") + theme(text = element_text(size = 15),legend.position="none",axis.ticks.length=unit(-0.1, "cm"))
+print(p)
+```

@@ -1,0 +1,105 @@
+---
+title: "Fig2_accurate_neural_prediction"
+author: "Xiaochun Han"
+date: "2026-02-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+rm(list = ls())
+source("../functions_library.R") 
+load_packages(c("dplyr", "caret", "e1071","ggplot2", "pROC", "reshape2", "rstatix","pROC"))
+```
+
+## Import data
+```{r import data}
+data_all_invest = readRDS("data_all_invest.RData")
+data_ACT_FC_invest = readRDS("data_ACT_FC_invest.RData")
+data_WNC_BNC_invest = readRDS("data_WNC_BNC_invest.RData")
+```
+
+## Accuracy
+```{r svm_acc}
+acc_all = svm_cv_accuracy(data_all_invest,5,100,"radial")
+acc_act_fc = svm_cv_accuracy(data_ACT_FC_invest,5,100,"radial")
+acc_wnc_bnc = svm_cv_accuracy(data_WNC_BNC_invest,5,100,"radial")
+```
+
+## ROC plots
+### Fig2A_All_features_ROC
+```{r svm_invest_all}
+auc_all = auc_boot_cv(data_all_invest,5,"radial",1000,TRUE,'#000000')
+```
+
+### Fig2C_Inter_features_ROC
+```{r svm_invest_WNC&BNC}
+auc_wnc_bnc = auc_boot_cv(data_WNC_BNC_invest,5,"radial",1000,TRUE,'#5BB9E8')
+```
+
+### Fig2E_Intra_features_ROC
+```{r svm_invest_ACT&FC}
+auc_act_fc = auc_boot_cv(data_ACT_FC_invest,5,"radial",1000,TRUE,'#FF9784')
+```
+
+## Permutation test plot
+### Permutation test
+```{r permute_test, eval=FALSE}
+acc_all_perm = svm_perm(data_all_invest,5,5000,"radial")
+acc_wnc_bnc_perm = svm_perm(data_WNC_BNC_invest,5,5000,"radial")
+acc_act_fc_perm = svm_perm(data_ACT_FC_invest,5,5000,"radial")
+saveRDS(acc_all_perm, "SVM_win_all_perm_5000.RData")
+saveRDS(acc_wnc_bnc_perm, "SVM_win_WNC_BNC_perm_5000.RData")
+saveRDS(acc_act_fc_perm, "SVM_win_ACT_FC_perm_5000.RData")
+```
+
+### Fig2B_All_feature_permutation_plot
+```{r permute_all}
+acc_all_perm = readRDS("SVM_win_all_perm_5000.RData")
+acc_all_low_25 = sort(acc_all_perm$acc_perm)[125]
+acc_all_top_25 = sort(acc_all_perm$acc_perm)[4875]
+acc_all_perm$ci95 = rep(0,5000)
+acc_all_perm$ci95[(acc_all_perm$acc_perm<acc_all_low_25|acc_all_perm$acc_perm>acc_all_top_25)] = 1
+acc_all = 0.7618
+
+p<-ggplot(acc_all_perm, aes(x = acc_perm, fill = as.factor(ci95))) +
+    geom_histogram(colour = "#4C4C4C", bins = 61) + 
+    scale_fill_manual(values = c("white","#000000"))+
+    geom_vline(aes(xintercept = acc_all), color = "#000000", linewidth = 3) + theme_classic()+xlim(0,1) + 
+    labs(x = "Win-Lose Prediction Accuracy") + theme(text = element_text(size = 15),legend.position="none",axis.ticks.length=unit(-0.1, "cm"))
+print(p)
+```
+
+### Fig2D_Inter_feature_permutation_plot
+```{r permute_WNC&BNC}
+acc_wnc_bnc_perm = readRDS("SVM_win_WNC_BNC_perm_5000.RData")
+acc_low_25 = sort(acc_wnc_bnc_perm$acc_perm)[125]
+acc_top_25 = sort(acc_wnc_bnc_perm$acc_perm)[4875]
+acc_wnc_bnc_perm$ci95 = rep(0,5000)
+acc_wnc_bnc_perm$ci95[(acc_wnc_bnc_perm$acc_perm<acc_low_25|acc_wnc_bnc_perm$acc_perm>acc_top_25)] = 1
+acc_wnc_bnc = 0.9212
+
+p<-ggplot(acc_wnc_bnc_perm, aes(x = acc_perm, fill = as.factor(ci95))) +
+    geom_histogram(colour = "#4C4C4C", bins = 61) + 
+    scale_fill_manual(values = c("white","#5BB9E8"))+
+    geom_vline(aes(xintercept = acc_wnc_bnc), color = "#5BB9E8", linewidth = 3) + theme_classic()+xlim(0,1) + 
+    labs(x = "Win-Lose Prediction Accuracy") + theme(text = element_text(size = 15),legend.position="none",axis.ticks.length=unit(-0.1, "cm"))
+print(p)
+```
+
+### Fig2F_Intra_feature_permutation_plot
+```{r permute_ACT&FC}
+acc_act_fc_perm = readRDS("SVM_win_ACT_FC_perm_5000.RData")
+acc_low_25 = sort(acc_act_fc_perm$acc_perm)[125]
+acc_top_25 = sort(acc_act_fc_perm$acc_perm)[4875]
+acc_act_fc_perm$ci95 = rep(0,5000)
+acc_act_fc_perm$ci95[(acc_act_fc_perm$acc_perm<acc_low_25|acc_act_fc_perm$acc_perm>acc_top_25)] = 1
+acc_act_fc = 0.5823
+
+p<-ggplot(acc_act_fc_perm, aes(x = acc_perm, fill = as.factor(ci95))) +
+    geom_histogram(colour = "#4C4C4C", bins = 61) + 
+    scale_fill_manual(values = c("white","#FF9784"))+
+    geom_vline(aes(xintercept = acc_act_fc), color = "#FF9784", linewidth = 3) + theme_classic()+xlim(0,1) + 
+    labs(x = "Win-Lose Prediction Accuracy") + theme(text = element_text(size = 15),legend.position="none",axis.ticks.length=unit(-0.1, "cm"))
+print(p)
+```

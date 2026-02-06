@@ -1,0 +1,255 @@
+---
+title: "Fig3_PNICO_and_info_track"
+author: "Xiaochun Han"
+date: "2026-02-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+rm(list = ls())
+source("../functions_library.R")
+load_packages(c("dplyr", "caret", "e1071","ggplot2", "pROC", "reshape2", "rstatix","plotrix","psych","readxl","ggpubr","car","ppcor"))
+```
+## groupSucc&info_track
+### reorg data
+```{r reorg data_suss}
+tr <- read_excel('Info_track_coef.xlsx',sheet="raw_data")
+InfoTrack_Attack_Lead = tr[((tr$roleA1D2 == 1)&(tr$leadL1F2==1)),
+                                   c("alpha1","alpha2","beta1")]
+InfoTrack_Attack_Follow = tr[((tr$roleA1D2 == 1)&(tr$leadL1F2==0)),
+                                   c("alpha1","alpha2","beta1")]
+InfoTrack_Defend_Lead = tr[((tr$roleA1D2 == 2)&(tr$leadL1F2==1)),
+                                   c("alpha1","alpha2","beta1")]
+InfoTrack_Defend_Follow = tr[((tr$roleA1D2 == 2)&(tr$leadL1F2==0)),
+                                   c("alpha1","alpha2","beta1")]
+groupSuccess = tr[((tr$roleA1D2 == 1)&(tr$leadL1F2==1)), "groupSuccess"]
+
+names(InfoTrack_Attack_Lead) = c("AL_alpha1","AL_alpha2","AL_beta1")
+names(InfoTrack_Attack_Follow) = c("AF_alpha1","AF_alpha2","AF_beta1")
+names(InfoTrack_Defend_Lead) = c("DL_alpha1","DL_alpha2","DL_beta1")
+names(InfoTrack_Defend_Follow) = c("DF_alpha1","DF_alpha2","DF_beta1")
+
+df_org_infoTrack = cbind(groupSuccess,InfoTrack_Attack_Lead,InfoTrack_Attack_Follow,InfoTrack_Defend_Lead,InfoTrack_Defend_Follow)
+df_org_infoTrack_Attack = cbind(groupSuccess,InfoTrack_Attack_Lead,InfoTrack_Attack_Follow)
+df_org_infoTrack_Defend = cbind(groupSuccess,InfoTrack_Defend_Lead,InfoTrack_Defend_Follow)
+```
+
+### Multivariate Regression
+```{r Regress_analysis_suss}
+model_list <- list(
+model_all <- lm(groupSuccess ~ ., data = df_org_infoTrack),
+model_attack <- lm(groupSuccess ~ ., data = df_org_infoTrack_Attack),
+model_defend <- lm(groupSuccess ~ ., data = df_org_infoTrack_Defend)
+)
+
+R2 <- data.frame(
+  Model_Name = c("model_all","model_attack","model_defend"),
+  R_squared = numeric(length(model_list)),
+  stringsAsFactors = FALSE
+)
+
+for (i in seq_along(model_list)) {
+  model_summary <- summary(model_list[[i]])
+  R2$R_squared[i] <- model_summary$r.squared
+}
+```
+
+### Regression cross-validation
+```{r cross_valid_suss}
+cv_list <- list(
+cv_all = lm_cv_correlation(df_org_infoTrack,5,100),
+cv_attack = lm_cv_correlation(df_org_infoTrack_Attack,5,100),
+cv_defend = lm_cv_correlation(df_org_infoTrack_Defend,5,100)
+)
+
+Rvalue <- data.frame(
+  r_values = sapply(cv_list, function(x) x),
+  stringsAsFactors = FALSE
+)
+```
+
+### Permutation cross-validation
+```{r permutation_suss, eval=FALSE}
+#Attacker-leader
+perm_all = lm_perm(df_org_infoTrack,5,5000)
+perm_attack = lm_perm(df_org_infoTrack_Attack,5,5000)
+perm_defend = lm_perm(df_org_infoTrack_Defend,5,5000)
+saveRDS(perm_all, "lm_perm_all_5000_r.RData")
+saveRDS(perm_attack, "lm_perm_attack_5000_r.RData")
+saveRDS(perm_defend, "lm_perm_defend_5000_r.RData")
+```
+
+### Permutation read
+```{r perm_read_suss}
+perm_all = readRDS("lm_perm_all_5000_r.RData")
+perm_attack = readRDS("lm_perm_attack_5000_r.RData")
+perm_defend = readRDS("lm_perm_defend_5000_r.RData")
+```
+
+### Permutation p value
+```{r Summary_R2_suss}
+p_perm_list <- list(
+  p_perm_all = mean(cv_list$cv_all<perm_all$lm_perm),
+  p_perm_attack = mean(cv_list$cv_attack<perm_attack$lm_perm),
+  p_perm_defend = mean(cv_list$cv_defend<perm_defend$lm_perm)
+)
+
+p_perm <- data.frame(
+  p_values = sapply(p_perm_list, function(x) x),
+  stringsAsFactors = FALSE
+)
+```
+
+### Fig3A_tracking parameter predict group success
+```{r linear_suss}
+mr = data.frame(df_org_infoTrack$groupSuccess, model_all$fitted.values)
+names(mr) = c("trueSuccess", "predictedSuccess")
+
+p <- ggplot(mr, aes(x=trueSuccess, y=predictedSuccess)) +
+  geom_point(color="#0D0D0D", size = 4, alpha = 0.8) +
+  geom_smooth(method=lm , color="black", se=TRUE) +
+  theme_classic()
+print(p)
+```
+
+## info_track&neural
+### reorg data
+```{r reorg data_info_track}
+#Attacker-Leader-WNC
+beh_ALW_alpha1 = tr[((tr$roleA1D2 == 1)&(tr$leadL1F2==1)),c("alpha1")]
+beh_ALW_alpha2 = tr[((tr$roleA1D2 == 1)&(tr$leadL1F2==1)),c("alpha2")]
+neural_ALW = tr[((tr$roleA1D2 == 1)&(tr$leadL1F2==1)),grepl('WNC_CH', colnames(tr))]
+df_org_ALW_alpha1 = cbind(beh_ALW_alpha1,neural_ALW)
+df_org_ALW_alpha2 = cbind(beh_ALW_alpha2,neural_ALW)
+
+#Attacker-Leader-BNC
+beh_ALB = tr[((tr$roleA1D2 == 1)&(tr$leadL1F2==1)),c("beta1")]
+neural_ALB = tr[((tr$roleA1D2 == 1)&(tr$leadL1F2==1)),grepl('BNC_CH', colnames(tr))]
+df_org_ALB = cbind(beh_ALB,neural_ALB)
+
+#Attacker-Follower-WNC
+beh_AFW_alpha1 = tr[((tr$roleA1D2 == 1)&(tr$leadL1F2==0)),c("alpha1")]
+beh_AFW_alpha2 = tr[((tr$roleA1D2 == 1)&(tr$leadL1F2==0)),c("alpha2")]
+neural_AFW = tr[((tr$roleA1D2 == 1)&(tr$leadL1F2==0)),grepl('WNC_CH', colnames(tr))]
+df_org_AFW_alpha1 = cbind(beh_AFW_alpha1,neural_AFW)
+df_org_AFW_alpha2 = cbind(beh_AFW_alpha2,neural_AFW)
+
+#Attacker-Follower-BNC
+beh_AFB = tr[((tr$roleA1D2 == 1)&(tr$leadL1F2==0)),c("beta1")]
+neural_AFB = tr[((tr$roleA1D2 == 1)&(tr$leadL1F2==0)),grepl('BNC_CH', colnames(tr))]
+df_org_AFB = cbind(beh_AFB,neural_AFB)
+```
+
+### Multivariate Regression
+```{r Regress_analysis_info_track}
+model_list <- list(
+#Attacker-leader
+ALW_alpha1 <- lm(alpha1 ~ ., data = df_org_ALW_alpha1),
+ALW_alpha2 <- lm(alpha2 ~ ., data = df_org_ALW_alpha2),
+ALB_beta1 <- lm(beta1 ~ ., data = df_org_ALB),
+
+#Attacker-follower
+AFW_alpha1 <- lm(alpha1 ~ ., data = df_org_AFW_alpha1),
+AFW_alpha2 <- lm(alpha2 ~ ., data = df_org_AFW_alpha2),
+AFB_beta1 <- lm(beta1 ~ ., data = df_org_AFB)
+)
+
+R2 <- data.frame(
+  Model_Name = c("ALW_alpha1","ALW_alpha2","ALB_beta1",
+                 "AFW_alpha1","AFW_alpha2","AFB_beta1"),
+  R_squared = numeric(length(model_list)),
+  stringsAsFactors = FALSE
+)
+
+for (i in seq_along(model_list)) {
+  model_summary <- summary(model_list[[i]])
+  R2$R_squared[i] <- model_summary$r.squared
+}
+```
+
+### Regression cross-validation
+```{r cross_valid_info_track}
+cv_list <- list(
+#Attacker-leader
+cv_ALW_alpha1 = lm_cv_correlation(df_org_ALW_alpha1,5,100,TRUE,beh_ALW_alpha2$alpha2),
+cv_ALW_alpha2 = lm_cv_correlation(df_org_ALW_alpha2,5,100,TRUE,beh_ALW_alpha1$alpha1),
+cv_ALB_beta1 = lm_cv_correlation(df_org_ALB,5,100),
+
+#Attacker-follower
+cv_AFW_alpha1 = lm_cv_correlation(df_org_AFW_alpha1,5,100,TRUE,beh_AFW_alpha2$alpha2),
+cv_AFW_alpha2 = lm_cv_correlation(df_org_AFW_alpha2,5,100,TRUE,beh_AFW_alpha1$alpha1),
+cv_AFB_beta1 = lm_cv_correlation(df_org_AFB,5,100)
+)
+
+R_value <- data.frame(
+  r_values = sapply(cv_list, function(x) x),
+  stringsAsFactors = FALSE
+)
+```
+
+### Permutation cross-validation
+```{r permutation_info_track, eval=FALSE}
+#Attacker-leader
+perm_ALW_alpha1 = lm_perm(df_org_ALW_alpha1,5,5000,TRUE,beh_ALW_alpha2$alpha2)
+perm_ALW_alpha2 = lm_perm(df_org_ALW_alpha2,5,5000,TRUE,beh_ALW_alpha1$alpha1)
+perm_ALB_beta1 = lm_perm(df_org_ALB,5,5000)
+
+#Attacker-follower
+perm_AFW_alpha1 = lm_perm(df_org_AFW_alpha1,5,5000,TRUE,beh_AFW_alpha2$alpha2)
+perm_AFW_alpha2 = lm_perm(df_org_AFW_alpha2,5,5000,TRUE,beh_AFW_alpha1$alpha1)
+perm_AFB_beta1 = lm_perm(df_org_AFB,5,5000)
+
+#Attacker-leader
+saveRDS(perm_ALW_alpha1, "lm_perm_ALW_alpha1_5000_partial_r.RData")
+saveRDS(perm_ALW_alpha2, "lm_perm_ALW_alpha2_5000_partial_r.RData")
+saveRDS(perm_ALB_beta1, "lm_perm_ALB_beta1_5000_r.RData")
+
+#Attacker-follower
+saveRDS(perm_AFW_alpha1, "lm_perm_AFW_alpha1_5000_partial_r.RData")
+saveRDS(perm_AFW_alpha2, "lm_perm_AFW_alpha2_5000_partial_r.RData")
+saveRDS(perm_AFB_beta1, "lm_perm_AFB_beta1_5000_r.RData")
+```
+
+### Permutation read
+```{r perm_read_info_track}
+#Attacker-leader
+perm_ALW_alpha1 = readRDS("lm_perm_ALW_alpha1_5000_partial_r.RData")
+perm_ALW_alpha2 = readRDS("lm_perm_ALW_alpha2_5000_partial_r.RData")
+perm_ALB_beta1 = readRDS("lm_perm_ALB_beta1_5000_r.RData")
+
+#Attacker-follower
+perm_AFW_alpha1 = readRDS("lm_perm_AFW_alpha1_5000_partial_r.RData")
+perm_AFW_alpha2 = readRDS("lm_perm_AFW_alpha2_5000_partial_r.RData")
+perm_AFB_beta1 = readRDS("lm_perm_AFB_beta1_5000_r.RData")
+```
+
+### Permutation p value
+```{r Summary_R2_info_track}
+p_perm_list <- list(
+  p_perm_ALW_alpha1 = mean(cv_list$cv_ALW_alpha1<perm_ALW_alpha1$lm_perm),
+  p_perm_ALW_alpha2 = mean(cv_list$cv_ALW_alpha2<perm_ALW_alpha2$lm_perm),
+  p_perm_ALB_beta1 = mean(cv_list$cv_ALB_beta1<perm_ALB_beta1$lm_perm),
+  p_perm_AFW_alpha1 = mean(cv_list$cv_AFW_alpha1<perm_AFW_alpha1$lm_perm),
+  p_perm_AFW_alpha2 = mean(cv_list$cv_AFW_alpha2<perm_AFW_alpha2$lm_perm),
+  p_perm_AFB_beta1 = mean(cv_list$cv_AFB_beta1<perm_AFB_beta1$lm_perm)
+)
+
+p_perm <- data.frame(
+  p_values = sapply(p_perm_list, function(x) x),
+  stringsAsFactors = FALSE
+)
+```
+
+### Fig3B_ALB_beta1
+```{r ALB_fig}
+ALB_fig = data.frame(df_org_ALB$beta1, model_list[[3]]$fitted.values)
+names(ALB_fig) = c("trueBeta1", "predictedBeta1")
+
+p<-ggplot(ALB_fig, aes(x=trueBeta1, y=predictedBeta1)) +
+  geom_point(color="#946CFF", size = 4) +
+  geom_smooth(method=lm , color="#0D0D0D", se=TRUE) +
+  theme_classic()
+
+print(p)
+```

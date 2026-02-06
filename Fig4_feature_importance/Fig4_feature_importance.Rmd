@@ -1,0 +1,184 @@
+---
+title: "Fig4_feature_importance.Rmd"
+author: "Xiaochun Han"
+date: "2026-02-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,warning = FALSE, message = FALSE)
+rm(list = ls())
+source("../functions_library.R")
+load_packages(c("dplyr", "caret", "e1071","ggplot2", "pROC", "reshape2", "rstatix","lime","ggbeeswarm"))
+```
+
+## Import data
+```{r impart_data,eval=FALSE}
+data_WNC_BNC_invest = readRDS("data_WNC_BNC_invest.RData")
+```
+
+## Feature importance analysis
+```{r svm_feat_impor,eval=FALSE}
+featSet = colnames(data_WNC_BNC_invest[,2:ncol(data_WNC_BNC_invest)])
+fi_fs_invest = list()
+for (f in 1:length(featSet)){
+  fi_invest = svm_feat_impor(data_WNC_BNC_invest,featSet[f],5,100,5000)
+  fi_fs_invest[[f]] = fi_invest
+  names(fi_fs_invest)[f] = featSet[f]
+}
+saveRDS(fi_fs_invest, file = "fi_invest_WNC_BNC_5000.RData")
+```
+
+### Feature importance read
+```{r read_feat_impor}
+fi_fs_invest = readRDS("fi_invest_WNC_BNC_5000.RData")
+acc_wnc_bnc = 0.9212
+dec_acc = vector(length = 112)
+for (v in 1:length(fi_fs_invest)){
+  dec_acc[v] = (acc_wnc_bnc - mean(fi_fs_invest[[v]][[2]]$acc_perm))*100
+}
+
+fi_all <- data.frame(
+  name = names(fi_fs_invest),
+  fi_value_percent = dec_acc)
+
+fi_sorted <- fi_all %>%
+  arrange(
+    desc(grepl("Attack", name)),  
+    desc(grepl("_L_", name)),       
+    desc(grepl("WNC", name)),
+    desc(grepl("rDLPFC", name))  
+  )
+```
+
+## Top features
+### Feature selection
+```{r fi-select}
+threshold_value <- mean(fi_all$fi_value_percent) + sd(fi_all$fi_value_percent)
+
+filtered_fi <- fi_all %>%
+  filter(fi_value_percent > threshold_value) %>%  
+  arrange(desc(fi_value_percent))
+```
+
+### Fig4B_Top14 features
+```{r figure_top14}
+color_vector <- sapply(filtered_fi$name, function(x) {
+  if (grepl("WNC", x)) return("#0271F2")
+  if (grepl("BNC", x)) return("#00DFDA")
+})
+
+filtered_fi$name <- factor(filtered_fi$name, levels = filtered_fi$name)
+
+p <- ggplot(filtered_fi) +
+  geom_bar(aes(x = name, y = fi_value_percent, fill = color_vector), stat = "identity") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 0), legend.position = "none") +
+  labs(x = "Feature space", y = "Feature importance") +
+  scale_fill_identity() +
+  theme(text = element_text(size = 10),
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 90),
+        panel.background = element_rect(fill = "transparent", color = NA),
+        plot.background = element_rect(fill = "transparent", color = NA))
+
+print(p)
+```
+
+## Attack vs. Defender
+### ttest
+```{r ttest-fi-ad}
+fi_A = fi_all$fi_value_percent[grepl('_Attack_', fi_all$name)]
+fi_D = fi_all$fi_value_percent[grepl('_Defend_', fi_all$name)]
+df = data.frame(fi_A, fi_D)
+df <- df %>% gather(key = "feature", value = "value")
+df %>% group_by(feature) %>% summarize(mean = mean(value), sd = sd(value))
+t.test(value~feature, data = df, var.equal = TRUE)
+cohens_d(value~feature, data = df, var.equal = TRUE)
+```
+
+### Fig4B_Attacker_vs_Defender
+```{r figure-fi-ad}
+summary_data <- df %>% group_by(feature) %>% summarize(Mean = mean(value), SE = sd(value)/sqrt(n()))
+p<-ggplot(summary_data, aes(x = feature, y = Mean, fill = feature)) +
+  geom_hline(aes(yintercept = 0), color = "black", linewidth = 0.8, linetype = 1) +
+  geom_col(width = 0.6, color = "black") +
+  scale_fill_manual(values = c("#946CFF","#00B050"))+
+  geom_jitter(
+    data = df,
+    aes(y = value, x = feature),
+    width = 0, size = 2, alpha = 0.6, color = "grey"
+  ) +
+  geom_errorbar(
+    aes(ymin = Mean - SE, ymax = Mean + SE),
+    width = 0.2, color = "black", size = 0.5
+  ) +
+  scale_y_continuous(
+    limits = c(-0.5, 1),              
+    breaks = c(-0.5, 0, 0.5, 1)  
+  )  +
+  theme_classic()+
+  theme(legend.position = "none")
+print(p)
+```
+
+## Directional influence
+### LIME analysis
+```{r lime,eval=FALSE}
+data_WNC_BNC_invest_top14 = data_WNC_BNC_invest %>%
+  select(c(any_of(as.character(filtered_fi$name)), "good_1")) %>%
+  relocate("good_1", .before = 1)
+weight = svm_lime(data_WNC_BNC_invest_top14,2,"yes",14,"none")
+saveRDS(weight, "svm_win_WNC_BNC_lime.RData")
+```
+
+### Fig4C_directional_influence
+```{r figure}
+weight = readRDS("svm_win_WNC_BNC_lime.RData")
+
+for (i in 1:3) {
+    current_mean <- mean(weight$feature_weight, na.rm = TRUE)
+    current_sd <- sd(weight$feature_weight, na.rm = TRUE)
+    upper_lim <- current_mean + 3 * current_sd
+    lower_lim <- current_mean - 3 * current_sd
+    
+    na_before <- sum(is.na(weight$feature_weight))
+    weight$feature_weight[weight$feature_weight > upper_lim | weight$feature_weight < lower_lim] <- NA
+    new_na <- sum(is.na(weight$feature_weight)) - na_before
+    
+    cat("round", i, ": Mean=", round(current_mean, 4), "SD=", round(current_sd, 4),
+        "new outlier=", new_na, "\n")
+  }
+  
+  cat("Final outlier number:", sum(is.na(weight$feature_weight)), "\n")
+
+my_custom_order <- c(
+  'BNC_Attack_L_rDLPFC_CH02',
+  'WNC_Attack_F_rDLPFC_CH02',
+  'WNC_Attack_F_rDLPFC_CH05',
+  'WNC_Attack_F_rDLPFC_CH07',
+  'WNC_Attack_L_rDLPFC_CH01',
+  'WNC_Attack_F_rDLPFC_CH03',
+  'BNC_Attack_L_rDLPFC_CH05',
+  'WNC_Attack_L_rDLPFC_CH05',
+  'BNC_Attack_L_rDLPFC_CH07',
+  'WNC_Defend_L_rDLPFC_CH05',
+  'BNC_Defend_L_rTPJ_CH10',
+  'BNC_Defend_L_rTPJ_CH08',
+  'BNC_Attack_F_rTPJ_CH10',
+  'WNC_Attack_L_rTPJ_CH08')
+
+weight$feature <- factor(weight$feature, levels = my_custom_order)
+
+weight$type[weight$feature_value > 0] = 'pos'
+weight$type[weight$feature_value < 0] = 'neg'
+
+p<-ggplot(weight, aes(x = feature, y = feature_weight, color = feature_value))+
+  geom_hline(yintercept = 0) +
+  geom_quasirandom(bandwidth = 0.1,size = 3) + 
+  scale_fill_manual(values = c("white", "white"))+
+  scale_color_gradientn(colours = c('#1F4E79', '#2E75B6','white','#D96F6F','#931624'),limits = c(-5, 5),breaks = c(-5, 0, 5)) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+print(p)
+```
