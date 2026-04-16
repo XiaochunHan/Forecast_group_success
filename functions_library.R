@@ -2,10 +2,29 @@
 ## Function0: load_packages
 load_packages <- function(pkgs) {
   for (pkg in pkgs) {
-    if (!require(pkg, character.only = TRUE)) {
-      stop(paste0("Package '", pkg, "' is not installed. Please run renv::restore() first."))
-    }
+    if (!require(pkg, character.only = TRUE, quietly = TRUE)) {
+      message("Package '", pkg, "' is not installed.")
+      
+      if (interactive()) {
+        # Ask user
+        answer <- tolower(readline(prompt = paste0(
+          "Install package '", pkg, "'? (y/n): "
+        )))
+        
+        if (answer %in% c("y", "yes")) {
+          message("Installing ", pkg, "...")
+          install.packages(pkg, dependencies = TRUE)
+          require(pkg, character.only = TRUE)
+          message(pkg, " successfully installed and loaded")
+        } else {
+          stop("Package '", pkg, "' is not installed. Installation cancelled by user.")
+        }
+      } else {
+        stop("Package '", pkg, "' is not installed. In non-interactive mode, you need to install packages manually.")
+      }
+    } 
   }
+  invisible(TRUE)
 }
 
 #===============================================================================
