@@ -22,11 +22,11 @@ data_WNC_BNC_invest = readRDS("data_WNC_BNC_invest.RData")
 featSet = colnames(data_WNC_BNC_invest[,2:ncol(data_WNC_BNC_invest)])
 fi_fs_invest = list()
 for (f in 1:length(featSet)){
-  fi_invest = svm_feat_impor(data_WNC_BNC_invest,featSet[f],5,100,5000)
+  fi_invest = svm_feat_impor(data_WNC_BNC_invest,featSet[f],5,5000)
   fi_fs_invest[[f]] = fi_invest
   names(fi_fs_invest)[f] = featSet[f]
 }
-saveRDS(fi_fs_invest, file = "fi_invest_WNC_BNC_5000.RData")
+#saveRDS(fi_fs_invest, file = "fi_invest_WNC_BNC_5000.RData")
 ```
 
 ### Feature importance read
@@ -126,10 +126,10 @@ print(p)
 ### LIME analysis
 ```{r lime,eval=FALSE}
 data_WNC_BNC_invest_top14 = data_WNC_BNC_invest %>%
-  select(c(any_of(as.character(filtered_fi$name)), "good_1")) %>%
-  relocate("good_1", .before = 1)
+  dplyr::select(dplyr::any_of(as.character(filtered_fi$name)), "good_1") %>%
+  dplyr::relocate("good_1", .before = 1)
 weight = svm_lime(data_WNC_BNC_invest_top14,2,"yes",14,"none")
-saveRDS(weight, "svm_win_WNC_BNC_lime.RData")
+#saveRDS(weight, "svm_win_WNC_BNC_lime.RData")
 ```
 
 ### Fig4C_directional_influence

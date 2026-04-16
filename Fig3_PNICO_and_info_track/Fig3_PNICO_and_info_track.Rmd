@@ -75,9 +75,9 @@ Rvalue <- data.frame(
 perm_all = lm_perm(df_org_infoTrack,5,5000)
 perm_attack = lm_perm(df_org_infoTrack_Attack,5,5000)
 perm_defend = lm_perm(df_org_infoTrack_Defend,5,5000)
-saveRDS(perm_all, "lm_perm_all_5000_r.RData")
-saveRDS(perm_attack, "lm_perm_attack_5000_r.RData")
-saveRDS(perm_defend, "lm_perm_defend_5000_r.RData")
+#saveRDS(perm_all, "lm_perm_all_5000_r.RData")
+#saveRDS(perm_attack, "lm_perm_attack_5000_r.RData")
+#saveRDS(perm_defend, "lm_perm_defend_5000_r.RData")
 ```
 
 ### Permutation read
@@ -201,14 +201,14 @@ perm_AFW_alpha2 = lm_perm(df_org_AFW_alpha2,5,5000,TRUE,beh_AFW_alpha1$alpha1)
 perm_AFB_beta1 = lm_perm(df_org_AFB,5,5000)
 
 #Attacker-leader
-saveRDS(perm_ALW_alpha1, "lm_perm_ALW_alpha1_5000_partial_r.RData")
-saveRDS(perm_ALW_alpha2, "lm_perm_ALW_alpha2_5000_partial_r.RData")
-saveRDS(perm_ALB_beta1, "lm_perm_ALB_beta1_5000_r.RData")
+#saveRDS(perm_ALW_alpha1, "lm_perm_ALW_alpha1_5000_partial_r.RData")
+#saveRDS(perm_ALW_alpha2, "lm_perm_ALW_alpha2_5000_partial_r.RData")
+#saveRDS(perm_ALB_beta1, "lm_perm_ALB_beta1_5000_r.RData")
 
 #Attacker-follower
-saveRDS(perm_AFW_alpha1, "lm_perm_AFW_alpha1_5000_partial_r.RData")
-saveRDS(perm_AFW_alpha2, "lm_perm_AFW_alpha2_5000_partial_r.RData")
-saveRDS(perm_AFB_beta1, "lm_perm_AFB_beta1_5000_r.RData")
+#saveRDS(perm_AFW_alpha1, "lm_perm_AFW_alpha1_5000_partial_r.RData")
+#saveRDS(perm_AFW_alpha2, "lm_perm_AFW_alpha2_5000_partial_r.RData")
+#saveRDS(perm_AFB_beta1, "lm_perm_AFB_beta1_5000_r.RData")
 ```
 
 ### Permutation read

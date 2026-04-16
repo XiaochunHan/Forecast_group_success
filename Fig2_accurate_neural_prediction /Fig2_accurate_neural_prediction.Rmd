@@ -48,9 +48,9 @@ auc_act_fc = auc_boot_cv(data_ACT_FC_invest,5,"radial",1000,TRUE,'#FF9784')
 acc_all_perm = svm_perm(data_all_invest,5,5000,"radial")
 acc_wnc_bnc_perm = svm_perm(data_WNC_BNC_invest,5,5000,"radial")
 acc_act_fc_perm = svm_perm(data_ACT_FC_invest,5,5000,"radial")
-saveRDS(acc_all_perm, "SVM_win_all_perm_5000.RData")
-saveRDS(acc_wnc_bnc_perm, "SVM_win_WNC_BNC_perm_5000.RData")
-saveRDS(acc_act_fc_perm, "SVM_win_ACT_FC_perm_5000.RData")
+#saveRDS(acc_all_perm, "SVM_win_all_perm_5000.RData")
+#saveRDS(acc_wnc_bnc_perm, "SVM_win_WNC_BNC_perm_5000.RData")
+#saveRDS(acc_act_fc_perm, "SVM_win_ACT_FC_perm_5000.RData")
 ```
 
 ### Fig2B_All_feature_permutation_plot

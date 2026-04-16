@@ -28,7 +28,7 @@ You can install them using:
 install.packages(c(
   "e1071",        # SVM implementation
   "caret",        # Cross-validation utilities
-  "ggplot2",      # Plotting
+  "ggplot2"       # Plotting
 ))
 ```
 

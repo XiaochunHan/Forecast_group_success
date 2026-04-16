@@ -96,8 +96,8 @@ svm_perm <- function(df,nfold,n_iter,koi){
 
 #===============================================================================
 ## Function5: svm_feat_impor
-svm_feat_impor <- function(df,feat,nfold,nCV,nPerm){
-  pb <- txtProgressBar(min = 0, max = n_iter, style = 3, width = 50, char = "=")  
+svm_feat_impor <- function(df,feat,nfold,nPerm){
+  pb <- txtProgressBar(min = 0, max = nPerm, style = 3, width = 50, char = "=")  
   df_perm = df
   acc_perm = data.frame();
   for (i in 1:nPerm){
@@ -240,7 +240,7 @@ svm_lime <- function(df,n_b,target_label,n_feat,select_method){
   df$good_1[df$good_1 == 0] <- 'no'
   df$good_1 = factor(df$good_1, levels = c("no", "yes"))
   df[-1] = scale(df[-1])
-  classifier <- train(good_1~., data=df, method = 'svmRadial', tuneGrid = data.frame(C=1, sigma = 1/ncol(training_fold[-1])), trControl=trainControl(classProbs = TRUE, method = "none"))
+  classifier <- train(good_1~., data=df, method = 'svmRadial', tuneGrid = data.frame(C=1, sigma = 1/ncol(df[-1])), trControl=trainControl(classProbs = TRUE, method = "none"))
   explainer <- lime(x = df[-1], model = classifier, n_bins = n_b)
   explanation <- lime::explain(df[-1], explainer, labels = target_label, n_features = n_feat, feature_select = select_method)
   
